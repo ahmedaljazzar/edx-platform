@@ -8,6 +8,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from search.search_engine_base import SearchEngine
+from request_cache import get_request
 
 from .errors import ElasticSearchConnectionError
 from .serializers import CourseTeamSerializer, CourseTeam
@@ -32,7 +33,8 @@ class CourseTeamIndexer(object):
 
         Returns serialized object with additional search fields.
         """
-        serialized_course_team = CourseTeamSerializer(self.course_team).data
+        serialized_course_team = self._serialize_course_team(self.course_team)
+
         # Save the primary key so we can load the full objects easily after we search
         serialized_course_team['pk'] = self.course_team.pk
         # Don't save the membership relations in elasticsearch
@@ -73,7 +75,7 @@ class CourseTeamIndexer(object):
         """
         if cls.search_is_enabled():
             search_engine = cls.engine()
-            serialized_course_team = CourseTeamIndexer(course_team).data()
+            serialized_course_team = cls._serialize_course_team(course_team)
             search_engine.index(cls.DOCUMENT_TYPE_NAME, [serialized_course_team])
 
     @classmethod
@@ -94,6 +96,30 @@ class CourseTeamIndexer(object):
         Return boolean of whether course team indexing is enabled.
         """
         return settings.FEATURES.get(cls.ENABLE_SEARCH_KEY, False)
+
+    @classmethod
+    def _serialize_course_team(cls, team):
+        """
+        Return a serialized version of a course team model.
+        """
+        # Django Rest Framework v3.1 requires that we pass the request to the serializer
+        # so it can construct hyperlinks.  To avoid changing the interface of this object,
+        # we retrieve the request from the request cache.
+        context = {
+            "request": cls._get_request()
+        }
+
+        return CourseTeamSerializer(team, context=context).data
+
+    @staticmethod
+    def _get_request():
+        """
+        Helper to retrieve the current request.
+
+        We make this a separate instance method to make it easier to patch
+        in unit tests.
+        """
+        return get_request()
 
 
 @receiver(post_save, sender=CourseTeam, dispatch_uid='teams.signals.course_team_post_save_callback')

@@ -5,10 +5,12 @@ import pytz
 from datetime import datetime
 from dateutil import parser
 import ddt
+from mock import patch
 
 from django.core.urlresolvers import reverse
 from django.conf import settings
 from django.db.models.signals import post_save
+from django.test.client import RequestFactory
 from nose.plugins.attrib import attr
 from rest_framework.test import APITestCase, APIClient
 
@@ -19,7 +21,7 @@ from student.models import CourseEnrollment
 from util.testing import EventTestMixin
 from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
 from xmodule.modulestore.tests.factories import CourseFactory
-from .factories import CourseTeamFactory, LAST_ACTIVITY_AT
+from .factories import CourseTeamFactory, LAST_ACTIVITY_AT, stub_team_index_request
 from ..search_indexes import CourseTeamIndexer, CourseTeam, course_team_post_save_callback
 
 from django_comment_common.models import Role, FORUM_ROLE_COMMUNITY_TA
@@ -31,11 +33,23 @@ class TestDashboard(SharedModuleStoreTestCase):
     """Tests for the Teams dashboard."""
     test_password = "test"
 
+    NUM_TOPICS = 10
+
     @classmethod
     def setUpClass(cls):
         super(TestDashboard, cls).setUpClass()
         cls.course = CourseFactory.create(
-            teams_configuration={"max_team_size": 10, "topics": [{"name": "foo", "id": 0, "description": "test topic"}]}
+            teams_configuration={
+                "max_team_size": 10,
+                "topics": [
+                    {
+                        "name": "Topic {}".format(topic_id),
+                        "id": topic_id,
+                        "description": "Description for topic {}".format(topic_id)
+                    }
+                    for topic_id in range(cls.NUM_TOPICS)
+                ]
+            }
         )
 
     def setUp(self):
@@ -91,6 +105,30 @@ class TestDashboard(SharedModuleStoreTestCase):
         self.client.login(username=self.user.username, password=self.test_password)
         response = self.client.get(teams_url)
         self.assertEqual(404, response.status_code)
+
+    def test_query_counts(self):
+        # Enroll in the course and log in
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+        self.client.login(username=self.user.username, password=self.test_password)
+
+        # Check the query count on the dashboard With no teams
+        with self.assertNumQueries(15):
+            self.client.get(self.teams_url)
+
+        # Create some teams
+        for topic_id in range(self.NUM_TOPICS):
+            team = CourseTeamFactory.create(
+                name=u"Team for topic {}".format(topic_id),
+                course_id=self.course.id,
+                topic_id=topic_id,
+            )
+
+        # Add the user to the last team
+        team.add_user(self.user)
+
+        # Check the query count on the dashboard again
+        with self.assertNumQueries(19):
+            self.client.get(self.teams_url)
 
     def test_bad_course_id(self):
         """
@@ -238,10 +276,14 @@ class TeamAPITestCase(APITestCase, SharedModuleStoreTestCase):
                 self.users[user], course.id, check_access=True
             )
 
-        self.solar_team.add_user(self.users['student_enrolled'])
-        self.nuclear_team.add_user(self.users['student_enrolled_both_courses_other_team'])
-        self.another_team.add_user(self.users['student_enrolled_both_courses_other_team'])
-        self.public_profile_team.add_user(self.users['student_enrolled_public_profile'])
+        # Django Rest Framework v3 requires us to pass a request to serializers
+        # that have URL fields.  Since we're invoking this code outside the context
+        # of a request, we need to simulate that there's a request.
+        with stub_team_index_request():
+            self.solar_team.add_user(self.users['student_enrolled'])
+            self.nuclear_team.add_user(self.users['student_enrolled_both_courses_other_team'])
+            self.another_team.add_user(self.users['student_enrolled_both_courses_other_team'])
+            self.public_profile_team.add_user(self.users['student_enrolled_public_profile'])
 
     def build_membership_data_raw(self, username, team):
         """Assembles a membership creation payload based on the raw values provided."""
@@ -297,7 +339,17 @@ class TeamAPITestCase(APITestCase, SharedModuleStoreTestCase):
             response = func(url, data=data, content_type=content_type)
         else:
             response = func(url, data=data)
-        self.assertEqual(expected_status, response.status_code)
+
+        self.assertEqual(
+            expected_status,
+            response.status_code,
+            msg="Expected status {expected} but got {actual}: {content}".format(
+                expected=expected_status,
+                actual=response.status_code,
+                content=response.content,
+            )
+        )
+
         if expected_status == 200:
             return json.loads(response.content)
         else:
@@ -523,7 +575,8 @@ class TestListTeamsAPI(EventTestMixin, TeamAPITestCase):
         CourseTeamIndexer.engine().destroy()
 
         for team in self.test_team_name_id_map.values():
-            CourseTeamIndexer.index(team)
+            with stub_team_index_request():
+                CourseTeamIndexer.index(team)
 
         self.verify_names(
             {'course_id': self.test_course_2.id, 'text_search': text_search},

@@ -24,15 +24,13 @@ from django_comment_client.tests.unicode import UnicodeTestMixin
 from django_comment_common.models import Role
 from django_comment_common.utils import seed_permissions_roles, ThreadContext
 from student.tests.factories import CourseEnrollmentFactory, UserFactory, CourseAccessRoleFactory
-from teams.tests.factories import CourseTeamFactory, CourseTeamMembershipFactory
+from teams.tests.factories import CourseTeamFactory, CourseTeamMembershipFactory, stub_team_index_request
 from util.testing import UrlResetMixin
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 from xmodule.modulestore.tests.factories import check_mongo_calls
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore import ModuleStoreEnum
-
-from teams.tests.factories import CourseTeamFactory
 
 
 log = logging.getLogger(__name__)
@@ -440,7 +438,8 @@ class ViewsTestCase(
         )
 
         # Add the student to the team so they can post to the commentable.
-        team.add_user(self.student)
+        with stub_team_index_request():
+            team.add_user(self.student)
 
         # create_thread_helper verifies that extra data are passed through to the comments service
         self.create_thread_helper(mock_request, extra_response_data={'context': ThreadContext.STANDALONE})
@@ -1290,7 +1289,9 @@ class TeamsPermissionsTestCase(UrlResetMixin, ModuleStoreTestCase, MockRequestSe
             topic_id='topic_id',
             discussion_topic_id=self.team_commentable_id
         )
-        self.team.add_user(self.student_in_team)
+
+        with stub_team_index_request():
+            self.team.add_user(self.student_in_team)
 
         # Dummy commentable ID not linked to a team
         self.course_commentable_id = "course_level_commentable"
@@ -1636,7 +1637,8 @@ class ForumEventTestCase(ModuleStoreTestCase, MockRequestSetupMixin):
         request.user = user
         request.view_name = view_name
 
-        getattr(views, view_name)(request, course_id=unicode(self.course.id), **view_kwargs)
+        with stub_team_index_request():
+            getattr(views, view_name)(request, course_id=unicode(self.course.id), **view_kwargs)
 
         name, event = mock_emit.call_args[0]
         self.assertEqual(name, event_name)

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """ Tests for student profile views. """
 
+from mock import patch
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.test import TestCase
@@ -34,6 +35,16 @@ class LearnerProfileViewTest(UrlResetMixin, TestCase):
         super(LearnerProfileViewTest, self).setUp()
         self.user = UserFactory.create(username=self.USERNAME, password=self.PASSWORD)
         self.client.login(username=self.USERNAME, password=self.PASSWORD)
+
+        # Django Rest Framework v3 requires that we pass the current request
+        # to serializers with hyperlink fields.  Usually, we call the user API
+        # in the context of a view, so the API call can retrieve the request
+        # from the request cache.  We need to simulate that here since we're calling
+        # the API method directly (not within the context of an HTTP request).
+        patcher = patch("openedx.core.djangoapps.user_api.preferences.api.get_request")
+        mock_get_request = patcher.start()
+        mock_get_request.returns = RequestFactory().get("/")
+        self.addCleanup(patcher.stop)
 
     def test_context(self):
         """
