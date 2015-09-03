@@ -463,6 +463,8 @@ EMBARGO_SITE_REDIRECT_URL = None
 ############################### Pipeline #######################################
 STATICFILES_STORAGE = 'openedx.core.lib.django_require.staticstorage.OptimizedCachedRequireJsStorage'
 
+PIPELINE_ENABLED = True
+
 from openedx.core.lib.rooted_paths import rooted_glob
 
 PIPELINE_CSS = {

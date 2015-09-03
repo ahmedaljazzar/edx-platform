@@ -36,6 +36,8 @@ FEATURES['PREVIEW_LMS_BASE'] = "preview." + LMS_BASE
 # Skip RequireJS optimizer in development
 STATICFILES_STORAGE = 'pipeline.storage.PipelineCachedStorage'
 
+PIPELINE_ENABLED = False
+
 ############################# ADVANCED COMPONENTS #############################
 
 # Make it easier to test advanced components in local dev

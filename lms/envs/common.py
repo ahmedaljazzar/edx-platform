@@ -1216,6 +1216,8 @@ X_FRAME_OPTIONS = 'ALLOW'
 
 STATICFILES_STORAGE = 'openedx.core.lib.django_require.staticstorage.OptimizedCachedRequireJsStorage'
 
+PIPELINE_ENABLED = True
+
 from openedx.core.lib.rooted_paths import rooted_glob
 
 courseware_js = (
