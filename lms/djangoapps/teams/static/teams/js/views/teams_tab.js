@@ -307,15 +307,16 @@
                             title: options.title,
                             description: options.description,
                             breadcrumbs: options.breadcrumbs
-                        });
+                        }),
+                        searchUrl = 'topics/' + topic.get('id') + '/search';
                     // Listen to requests to sync the collection and redirect it as follows:
                     // 1. If the collection includes a search, show the search results page
                     // 2. If not, then show the regular topic teams page
                     // Note: Backbone makes this a no-op if redirecting to the current page.
                     this.listenTo(collection, 'sync', function() {
                         if (collection.searchString) {
-                            Backbone.history.navigate('topics/' + topic.get('id') + '/search', {trigger: true});
-                        } else {
+                            Backbone.history.navigate(searchUrl, {trigger: true});
+                        } else if (Backbone.history.getFragment() === searchUrl) {
                             Backbone.history.navigate('topics/' + topic.get('id'), {trigger: true});
                         }
                     });

@@ -163,6 +163,7 @@ define([
                 // Perform a search
                 teamsTabView.$('.search-field').val('foo');
                 teamsTabView.$('.action-search').click();
+                Backbone.history.navigate('topics/' + TeamSpecHelpers.testTopicID + '/search', {trigger: false});
                 AjaxHelpers.respondWithJson(requests, {});
 
                 // Clear the search and submit it again
