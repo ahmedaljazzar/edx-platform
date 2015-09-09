@@ -1418,7 +1418,9 @@ class TeamPageTest(TeamsTabBase):
         And if I switch to "My Team", the team I have joined is displayed
         """
         self._set_team_configuration_and_membership(create_membership=False)
-        self.team_page.visit()
+        teams_page = BrowseTeamsPage(self.browser, self.course_id, self.topic)
+        teams_page.visit()
+        teams_page.view_first_team()
         self.assertTrue(self.team_page.join_team_button_present)
         expected_events = [
             {
@@ -1435,25 +1437,9 @@ class TeamPageTest(TeamsTabBase):
         self.assertFalse(self.team_page.join_team_message_present)
         self.assert_team_details(num_members=1, is_member=True)
 
-        # Verify that if one switches to "My Team" without reloading the page, the newly created team is shown.
+        # Verify that if one switches to "My Team" without reloading the page, the newly joined team is shown.
         self.teams_page.click_all_topics()
         self.verify_my_team_count(1)
-
-    def test_join_team_from_teams_page(self):
-        """
-        Scenario: User remains on a team's page after joing that team. See
-            TNL-3232.
-        Given I am enrolled in a course with a team
-        When I navigate to that team's page from the teams-for-topic page
-        And I join the team
-        Then I should remain on the page
-        """
-        self._set_team_configuration_and_membership(create_membership=False)
-        teams_page = BrowseTeamsPage(self.browser, self.course_id, self.topic)
-        teams_page.visit()
-        teams_page.view_first_team()
-        self.team_page.click_join_team_button()
-        self.assertTrue(self.team_page.is_browser_on_page())
 
     def test_already_member_message(self):
         """

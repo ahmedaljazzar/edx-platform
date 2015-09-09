@@ -76,6 +76,18 @@ define([
                 expectError(teamsTabView, 'The team "no_such_team" could not be found.');
                 expectFocus(teamsTabView.$('.warning'));
             });
+
+            it('does not navigate to the topics page when syncing its collection if not on the search page', function () {
+                var teamsTabView = createTeamsTabView(),
+                    collection = TeamSpecHelpers.createMockTeams();
+                teamsTabView.createTeamsListView({
+                    collection: collection,
+                    topic: TeamSpecHelpers.createMockTopic()
+                });
+                spyOn(Backbone.history, 'navigate');
+                collection.trigger('sync');
+                expect(Backbone.history.navigate).not.toHaveBeenCalled();
+            });
         });
 
         describe('Discussion privileges', function () {
@@ -163,6 +175,11 @@ define([
                 // Perform a search
                 teamsTabView.$('.search-field').val('foo');
                 teamsTabView.$('.action-search').click();
+                // Note: this is a bit of a hack -- without it the URL
+                // fragment won't be what it would be in the real
+                // app. This line sets the fragment without triggering
+                // callbacks, allowing teams_tab.js to detect the
+                // fragment correctly.
                 Backbone.history.navigate('topics/' + TeamSpecHelpers.testTopicID + '/search', {trigger: false});
                 AjaxHelpers.respondWithJson(requests, {});
 
