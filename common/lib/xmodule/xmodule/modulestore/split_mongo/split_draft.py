@@ -198,6 +198,12 @@ class DraftVersioningModuleStore(SplitMongoModuleStore, ModuleStoreDraftAndPubli
                 branches_to_delete = [ModuleStoreEnum.BranchName.published, ModuleStoreEnum.BranchName.draft]
             elif revision is None:
                 branches_to_delete = [ModuleStoreEnum.BranchName.draft]
+                parents_catogries = ['chapter', 'sequential', 'vertical']
+                if location.category in parents_catogries:
+                    item = self.get_item(location)
+                    if self.has_published_version(item) and not self.has_changes(item):
+                        branches_to_delete.insert(0, ModuleStoreEnum.BranchName.published)
+
             else:
                 raise UnsupportedRevisionError(
                     [
